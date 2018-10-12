@@ -28,6 +28,9 @@ extern crate log;
 extern crate hex;
 extern crate protobuf;
 extern crate sawtooth_sdk;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_json;
 extern crate simple_logger;
 
@@ -35,6 +38,7 @@ use std::process;
 
 use sawtooth_sdk::consensus::zmq_driver::ZmqDriver;
 
+mod storage;
 pub mod config;
 pub mod engine;
 pub mod error;
