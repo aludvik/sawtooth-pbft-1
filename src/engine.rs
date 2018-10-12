@@ -27,6 +27,8 @@ use config;
 use timing;
 
 use error::PbftError;
+use state::PbftState;
+use storage::{DiskStorage, Storage};
 
 #[derive(Default)]
 pub struct PbftEngine {}
@@ -60,29 +62,33 @@ impl Engine for PbftEngine {
             .expect("This node is not in the peers list, which is necessary")
             as u64;
 
+        let mut pbft_state =
+            DiskStorage::new_with_default("test.json", || PbftState::new(node_id, &config))
+                .unwrap();
+
         let mut working_ticker = timing::Ticker::new(config.block_duration);
         let mut backlog_ticker = timing::Ticker::new(config.message_timeout);
 
-        let mut node = PbftNode::new(node_id, &config, service);
+        let mut node = PbftNode::new(&config, service, pbft_state.read().is_primary());
 
-        debug!("Starting state: {:#?}", node.state);
+        debug!("Starting state: {:#?}", **pbft_state.read());
 
         // Event loop. Keep going until we receive a shutdown message.
         loop {
             let incoming_message = updates.recv_timeout(config.message_timeout);
+            let state = &mut **pbft_state.write();
 
             let res = match incoming_message {
-                Ok(Update::BlockNew(block)) => node.on_block_new(block),
-                Ok(Update::BlockValid(block_id)) => node.on_block_valid(block_id),
+                Ok(Update::BlockNew(block)) => node.on_block_new(block, state),
+                Ok(Update::BlockValid(block_id)) => node.on_block_valid(block_id, state),
                 Ok(Update::BlockInvalid(_)) => {
-                    warn!(
-                        "{}: BlockInvalid received, starting view change",
-                        node.state
-                    );
-                    node.start_view_change()
+                    warn!("{}: BlockInvalid received, starting view change", state);
+                    node.start_view_change(state)
                 }
-                Ok(Update::BlockCommit(block_id)) => node.on_block_commit(block_id),
-                Ok(Update::PeerMessage(message, _sender_id)) => node.on_peer_message(&message),
+                Ok(Update::BlockCommit(block_id)) => node.on_block_commit(block_id, state),
+                Ok(Update::PeerMessage(message, _sender_id)) => {
+                    node.on_peer_message(&message, state)
+                }
                 Ok(Update::Shutdown) => break,
                 Ok(Update::PeerConnected(_)) | Ok(Update::PeerDisconnected(_)) => {
                     error!("PBFT currently only supports static networks");
@@ -97,18 +103,18 @@ impl Engine for PbftEngine {
             handle_pbft_result(res);
 
             working_ticker.tick(|| {
-                if let Err(e) = node.try_publish() {
+                if let Err(e) = node.try_publish(state) {
                     error!("{}", e);
                 }
 
                 // Every so often, check to see if timeout has expired; initiate ViewChange if necessary
-                if node.check_timeout_expired() {
-                    handle_pbft_result(node.start_view_change());
+                if node.check_timeout_expired(state) {
+                    handle_pbft_result(node.start_view_change(state));
                 }
             });
 
             backlog_ticker.tick(|| {
-                handle_pbft_result(node.retry_backlog());
+                handle_pbft_result(node.retry_backlog(state));
             })
         }
     }

@@ -32,13 +32,13 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+extern crate serde_millis;
 extern crate simple_logger;
 
 use std::process;
 
 use sawtooth_sdk::consensus::zmq_driver::ZmqDriver;
 
-mod storage;
 pub mod config;
 pub mod engine;
 pub mod error;
@@ -49,6 +49,7 @@ pub mod message_type;
 pub mod node;
 mod protos;
 pub mod state;
+mod storage;
 pub mod timing;
 
 fn main() {
