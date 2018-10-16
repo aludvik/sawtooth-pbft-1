@@ -10,11 +10,11 @@ use std::ops::{Deref, DerefMut};
 pub trait StorageReadGuard<'a, T>: Deref<Target = T> {}
 pub trait StorageWriteGuard<'a, T>: DerefMut<Target = T> {}
 
-pub trait Storage<'a>: fmt::Display {
+pub trait Storage: fmt::Display {
     type S;
 
-    fn read(&'a self) -> Box<StorageReadGuard<'a, Self::S, Target = Self::S> + 'a>;
-    fn write(&'a mut self) -> Box<StorageWriteGuard<'a, Self::S, Target = Self::S> + 'a>;
+    fn read<'a>(&'a self) -> Box<StorageReadGuard<'a, Self::S, Target = Self::S> + 'a>;
+    fn write<'a>(&'a mut self) -> Box<StorageWriteGuard<'a, Self::S, Target = Self::S> + 'a>;
 }
 
 // Disk Storage-related structs and impls
@@ -146,14 +146,14 @@ impl<T: fmt::Display + Serialize + DeserializeOwned> fmt::Display for DiskStorag
     }
 }
 
-impl<'a, T: 'a + Serialize + DeserializeOwned + fmt::Display> Storage<'a> for DiskStorage<T> {
+impl<T: Serialize + DeserializeOwned + fmt::Display> Storage for DiskStorage<T> {
     type S = T;
 
-    fn read(&'a self) -> Box<StorageReadGuard<'a, T, Target = T> + 'a> {
+    fn read<'a>(&'a self) -> Box<StorageReadGuard<'a, T, Target = T> + 'a> {
         Box::new(DiskStorageReadGuard::new(self))
     }
 
-    fn write(&'a mut self) -> Box<StorageWriteGuard<'a, T, Target = T> + 'a> {
+    fn write<'a>(&'a mut self) -> Box<StorageWriteGuard<'a, T, Target = T> + 'a> {
         Box::new(DiskStorageWriteGuard::new(self))
     }
 }
@@ -247,14 +247,14 @@ impl<T: fmt::Display + Serialize + DeserializeOwned> fmt::Display for MemStorage
     }
 }
 
-impl<'a, T: 'a + Serialize + DeserializeOwned + fmt::Display> Storage<'a> for MemStorage<T> {
+impl<T: Serialize + DeserializeOwned + fmt::Display> Storage for MemStorage<T> {
     type S = T;
 
-    fn read(&'a self) -> Box<StorageReadGuard<'a, T, Target = T> + 'a> {
+    fn read<'a>(&'a self) -> Box<StorageReadGuard<'a, T, Target = T> + 'a> {
         Box::new(MemStorageReadGuard::new(self))
     }
 
-    fn write(&'a mut self) -> Box<StorageWriteGuard<'a, T, Target = T> + 'a> {
+    fn write<'a>(&'a mut self) -> Box<StorageWriteGuard<'a, T, Target = T> + 'a> {
         Box::new(MemStorageWriteGuard::new(self))
     }
 }
